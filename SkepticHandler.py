@@ -10,20 +10,34 @@ bot = telebot.TeleBot(bot_token)
 def generate_signal_message(signal):
     try:
         if ',' in signal:
-            # Handle the original formats: "HH:MM,PAIR-DIRECTION,CALL/PUT" or "HH:MM,PAIR-DIRECTION,CALL/PUT🔼/🔽"
+            # Handle original formats: "HH:MM,PAIR-DIRECTION,CALL/PUT" or "HH:MM,PAIR-DIRECTION,CALL/PUT🔼/🔽"
             parts = signal.split(',')
             if len(parts) != 3:
                 raise ValueError("Expected format: HH:MM,PAIR-DIRECTION,CALL/PUT")
             time_str, pair, direction = parts
 
         elif ';' in signal and '-' in signal:
-            # Handle the new format: "PAIR;OTC-HH:MM;CALL/PUT🔼/🔽"
             parts = signal.split(';')
-            if len(parts) != 3:
-                raise ValueError("Expected format: PAIR;OTC-HH:MM;CALL/PUT")
-            pair = parts[0]
-            time_str = parts[1].split('-')[-1]
-            direction = parts[2]
+            if len(parts) == 3:
+                # Handle format: "PAIR;OTC-HH:MM;CALL/PUT🔼/🔽"
+                pair = parts[0]
+                time_str = parts[1].split('-')[-1]
+                direction = parts[2]
+
+            elif len(parts) == 4:
+                # Handle format: "M1;PAIR;HH:MM;CALL/PUT🔼/🔽"
+                pair = parts[1]
+                time_str = parts[2]
+                direction = parts[3]
+
+            elif len(parts) == 5 and parts[1] == '' and parts[3] == '':
+                # Handle new format: "PAIR;;HH:MM;;CALL/PUT"
+                pair = parts[0]
+                time_str = parts[2]
+                direction = parts[4]
+
+            else:
+                raise ValueError("Expected format: PAIR;;HH:MM;;CALL/PUT")
 
         else:
             raise ValueError("Unknown format. Please ensure the signal is in the correct format.")
@@ -71,9 +85,13 @@ def send_welcome(message):
         "   Format 1: `HH:MM,PAIR-DIRECTION,CALL/PUT🔼/🔽`\n"
         "   Format 2: `HH:MM,PAIR-DIRECTION,CALL/PUT`\n"
         "   Format 3: `PAIR;OTC-HH:MM;CALL/PUT🔼/🔽`\n"
+        "   Format 4: `M1;PAIR;HH:MM;CALL/PUT🔼/🔽`\n"
+        "   Format 5: `PAIR;;HH:MM;;CALL/PUT`\n"
         "   Example:\n"
         "   `04:48,USDPKR-OTC,CALL🔼`\n"
-        "   `USDPHP;OTC-12:21;PUT🔽`\n\n"
+        "   `USDPHP;OTC-12:21;PUT🔽`\n"
+        "   `M1;USDNGN-OTC;01:21;PUT`\n"
+        "   `USDINR-OTC;;12:19;;PUT`\n\n"
         "   Make sure each signal is on a new line. The time should be in +06:00 timezone (e.g., Dhaka).\n\n"
         "2️⃣ **What the Bot Does**:\n"
         "   - The bot will adjust the provided time to be 30 minutes earlier.\n"
@@ -83,7 +101,8 @@ def send_welcome(message):
         "   - Example:\n"
         "     `/process_signals\n"
         "     09:31,USDPKR-OTC,CALL\n"
-        "     USDPHP;OTC-12:21;PUT🔽`\n\n"
+        "     M1;USDNGN-OTC;01:21;PUT🔽`\n"
+        "     USDINR-OTC;;12:19;;PUT`\n\n"
         "   The bot will then send you formatted messages for each signal with the correct time adjusted by 30 minutes.\n\n"
         "Feel free to start by entering your signals in the specified format!"
     )
@@ -112,3 +131,4 @@ def receive_signals(message):
 
 # Start the bot
 bot.polling()
+    
